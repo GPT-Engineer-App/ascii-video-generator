@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { saveAs } from "file-saver";
 
 const Index = () => {
   const [videoFile, setVideoFile] = useState(null);
@@ -21,8 +22,8 @@ const Index = () => {
 
     const convertToAscii = (frameData, width, height) => {
       let asciiStr = "";
-      for (let y = 0; y < height; y += 4) { // Increase vertical resolution
-        for (let x = 0; x < width; x += 2) { // Increase horizontal resolution
+      for (let y = 0; y < height; y += 2) { // Increase vertical resolution
+        for (let x = 0; x < width; x += 1) { // Increase horizontal resolution
           const offset = (y * width + x) * 4;
           const r = frameData[offset];
           const g = frameData[offset + 1];
@@ -40,8 +41,8 @@ const Index = () => {
       if (video.paused || video.ended) return;
 
       const aspectRatio = video.videoWidth / video.videoHeight;
-      canvas.width = 160 * aspectRatio; // Adjust canvas width based on aspect ratio
-      canvas.height = 160; // Fixed height for better resolution
+      canvas.width = 320 * aspectRatio; // Adjust canvas width based on aspect ratio
+      canvas.height = 320; // Fixed height for better resolution
 
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const frameData = context.getImageData(0, 0, canvas.width, canvas.height).data;
@@ -52,6 +53,11 @@ const Index = () => {
     };
 
     video.addEventListener("play", processFrame);
+  };
+
+  const handleDownload = () => {
+    const blob = new Blob([asciiFrames.join("\n\n")], { type: "text/plain;charset=utf-8" });
+    saveAs(blob, "ascii-art.txt");
   };
 
   useEffect(() => {
@@ -76,6 +82,7 @@ const Index = () => {
           <pre className="whitespace-pre-wrap text-xs leading-none">
             {asciiFrames[asciiFrames.length - 1]}
           </pre>
+          <Button onClick={handleDownload}>Download ASCII Art</Button>
         </div>
       )}
     </div>
