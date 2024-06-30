@@ -1,79 +1,74 @@
-import React, { useState, useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import React, { useState, useEffect, useRef } from 'react';
+import { Button } from '@/components/ui/button';
 
 const Index = () => {
-  const [videoFile, setVideoFile] = useState(null);
-  const [asciiFrames, setAsciiFrames] = useState([]);
+  const [asciiArt, setAsciiArt] = useState('');
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
-  const handleFileChange = (event) => {
-    setVideoFile(URL.createObjectURL(event.target.files[0]));
+  const handleVideoUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      videoRef.current.src = url;
+      videoRef.current.play();
+    }
+  };
+
+  const convertToAscii = (context, width, height) => {
+    const imageData = context.getImageData(0, 0, width, height);
+    const data = imageData.data;
+    let ascii = '';
+    const asciiChars = '@%#*+=-:. ';
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const avg = (r + g + b) / 3;
+      const charIndex = Math.floor((avg / 255) * (asciiChars.length - 1));
+      ascii += asciiChars[charIndex];
+      if ((i / 4 + 1) % width === 0) {
+        ascii += '\n';
+      }
+    }
+    return ascii;
   };
 
   const handleVideoPlay = () => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const context = canvas.getContext("2d");
+    const context = canvas.getContext('2d');
+    const width = video.videoWidth;
+    const height = video.videoHeight;
+    canvas.width = width;
+    canvas.height = height;
 
-    const asciiChars = "@%#*+=-:. ";
-
-    const convertToAscii = (frameData, width, height) => {
-      let asciiStr = "";
-      for (let y = 0; y < height; y += 8) {
-        for (let x = 0; x < width; x += 4) {
-          const offset = (y * width + x) * 4;
-          const r = frameData[offset];
-          const g = frameData[offset + 1];
-          const b = frameData[offset + 2];
-          const avg = (r + g + b) / 3;
-          const charIndex = Math.floor((avg / 255) * (asciiChars.length - 1));
-          asciiStr += asciiChars[charIndex];
-        }
-        asciiStr += "\n";
-      }
-      return asciiStr;
+    const drawFrame = () => {
+      context.drawImage(video, 0, 0, width, height);
+      const ascii = convertToAscii(context, width, height);
+      setAsciiArt(ascii);
+      requestAnimationFrame(drawFrame);
     };
 
-    const processFrame = () => {
-      if (video.paused || video.ended) return;
-
-      context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const frameData = context.getImageData(0, 0, canvas.width, canvas.height).data;
-      const asciiStr = convertToAscii(frameData, canvas.width, canvas.height);
-      setAsciiFrames((prevFrames) => [...prevFrames, asciiStr]);
-
-      requestAnimationFrame(processFrame);
-    };
-
-    video.addEventListener("play", processFrame);
+    drawFrame();
   };
 
   useEffect(() => {
-    if (videoFile) {
-      const video = videoRef.current;
-      video.addEventListener("play", handleVideoPlay);
-      return () => {
-        video.removeEventListener("play", handleVideoPlay);
-      };
-    }
-  }, [videoFile]);
+    const video = videoRef.current;
+    video.addEventListener('play', handleVideoPlay);
+    return () => {
+      video.removeEventListener('play', handleVideoPlay);
+    };
+  }, []);
 
   return (
-    <div className="h-screen w-screen flex flex-col items-center justify-center space-y-4">
-      <h1 className="text-3xl text-center">Video to ASCII Converter</h1>
-      <Input type="file" accept="video/*" onChange={handleFileChange} />
-      {videoFile && (
-        <div className="flex flex-col items-center space-y-4">
-          <video ref={videoRef} src={videoFile} controls className="w-full max-w-md" />
-          <canvas ref={canvasRef} className="hidden" width="160" height="90"></canvas>
-          <Button onClick={handleVideoPlay}>Convert to ASCII</Button>
-          <pre className="whitespace-pre-wrap text-xs leading-none">
-            {asciiFrames[asciiFrames.length - 1]}
-          </pre>
-        </div>
-      )}
+    <div className="h-screen w-screen flex flex-col items-center justify-center">
+      <h1 className="text-3xl text-center mb-4">Video to ASCII Converter</h1>
+      <input type="file" accept="video/*" onChange={handleVideoUpload} />
+      <video ref={videoRef} className="hidden" />
+      <canvas ref={canvasRef} className="hidden" />
+      <pre className="mt-4 whitespace-pre-wrap text-xs">{asciiArt}</pre>
     </div>
   );
 };
