@@ -2,15 +2,33 @@ import React, { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { saveAs } from "file-saver";
+import JSZip from "jszip";
 
 const Index = () => {
   const [videoFile, setVideoFile] = useState(null);
   const [asciiFrames, setAsciiFrames] = useState([]);
+  const [audioBlob, setAudioBlob] = useState(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
   const handleFileChange = (event) => {
-    setVideoFile(URL.createObjectURL(event.target.files[0]));
+    const file = event.target.files[0];
+    setVideoFile(URL.createObjectURL(file));
+    extractAudio(file);
+  };
+
+  const extractAudio = (file) => {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      audioContext.decodeAudioData(e.target.result, (buffer) => {
+        const audioBlob = new Blob([buffer], { type: "audio/wav" });
+        setAudioBlob(audioBlob);
+      });
+    };
+
+    reader.readAsArrayBuffer(file);
   };
 
   const handleVideoPlay = () => {
@@ -56,8 +74,17 @@ const Index = () => {
   };
 
   const handleDownload = () => {
-    const blob = new Blob([asciiFrames.join("\n\n")], { type: "text/plain;charset=utf-8" });
-    saveAs(blob, "ascii-art.txt");
+    const asciiVideoBlob = new Blob([asciiFrames.join("\n\n")], { type: "text/plain;charset=utf-8" });
+    const asciiVideoUrl = URL.createObjectURL(asciiVideoBlob);
+    const audioUrl = URL.createObjectURL(audioBlob);
+
+    const zip = new JSZip();
+    zip.file("ascii-art.txt", asciiVideoBlob);
+    zip.file("audio.wav", audioBlob);
+
+    zip.generateAsync({ type: "blob" }).then((content) => {
+      saveAs(content, "ascii-art-video.zip");
+    });
   };
 
   useEffect(() => {
@@ -82,7 +109,7 @@ const Index = () => {
           <pre className="whitespace-pre-wrap text-xs leading-none">
             {asciiFrames[asciiFrames.length - 1]}
           </pre>
-          <Button onClick={handleDownload}>Download ASCII Art</Button>
+          <Button onClick={handleDownload}>Download ASCII Art Video</Button>
         </div>
       )}
     </div>
