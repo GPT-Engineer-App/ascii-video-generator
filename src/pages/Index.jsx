@@ -21,8 +21,8 @@ const Index = () => {
 
     const convertToAscii = (frameData, width, height) => {
       let asciiStr = "";
-      for (let y = 0; y < height; y += 8) {
-        for (let x = 0; x < width; x += 4) {
+      for (let y = 0; y < height; y += 4) { // Increase vertical resolution
+        for (let x = 0; x < width; x += 2) { // Increase horizontal resolution
           const offset = (y * width + x) * 4;
           const r = frameData[offset];
           const g = frameData[offset + 1];
@@ -38,6 +38,10 @@ const Index = () => {
 
     const processFrame = () => {
       if (video.paused || video.ended) return;
+
+      const aspectRatio = video.videoWidth / video.videoHeight;
+      canvas.width = 160 * aspectRatio; // Adjust canvas width based on aspect ratio
+      canvas.height = 160; // Fixed height for better resolution
 
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const frameData = context.getImageData(0, 0, canvas.width, canvas.height).data;
@@ -67,7 +71,7 @@ const Index = () => {
       {videoFile && (
         <div className="flex flex-col items-center space-y-4">
           <video ref={videoRef} src={videoFile} controls className="w-full max-w-md" />
-          <canvas ref={canvasRef} className="hidden" width="160" height="90"></canvas>
+          <canvas ref={canvasRef} className="hidden"></canvas>
           <Button onClick={handleVideoPlay}>Convert to ASCII</Button>
           <pre className="whitespace-pre-wrap text-xs leading-none">
             {asciiFrames[asciiFrames.length - 1]}
