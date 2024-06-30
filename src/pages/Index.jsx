@@ -33,31 +33,23 @@ const Index = () => {
         offlineContext.startRendering().then((renderedBuffer) => {
           const wavBlob = bufferToWave(renderedBuffer, renderedBuffer.length);
           setAudioBlob(wavBlob);
-        }).catch((error) => {
-          console.error("Error rendering audio buffer:", error);
         });
-      }, (error) => {
-        console.error("Error decoding audio data:", error);
       });
-    };
-
-    reader.onerror = (error) => {
-      console.error("Error reading file:", error);
     };
 
     reader.readAsArrayBuffer(file);
   };
 
   const bufferToWave = (abuffer, len) => {
-    const numOfChan = abuffer.numberOfChannels,
-      length = len * numOfChan * 2 + 44,
-      buffer = new ArrayBuffer(length),
-      view = new DataView(buffer),
-      channels = [],
-      i,
-      sample,
-      offset = 0,
-      pos = 0;
+    const numOfChan = abuffer.numberOfChannels;
+    const length = len * numOfChan * 2 + 44;
+    const buffer = new ArrayBuffer(length);
+    const view = new DataView(buffer);
+    const channels = [];
+    let i;
+    let sample;
+    let offset = 0;
+    let pos = 0;
 
     setUint32(0x46464952); // "RIFF"
     setUint32(length - 8); // file length - 8
