@@ -23,12 +23,81 @@ const Index = () => {
 
     reader.onload = (e) => {
       audioContext.decodeAudioData(e.target.result, (buffer) => {
-        const audioBlob = new Blob([buffer], { type: "audio/wav" });
-        setAudioBlob(audioBlob);
+        const audioBuffer = audioContext.createBufferSource();
+        audioBuffer.buffer = buffer;
+        const offlineContext = new OfflineAudioContext(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
+        const offlineSource = offlineContext.createBufferSource();
+        offlineSource.buffer = buffer;
+        offlineSource.connect(offlineContext.destination);
+        offlineSource.start(0);
+        offlineContext.startRendering().then((renderedBuffer) => {
+          const wavBlob = bufferToWave(renderedBuffer, renderedBuffer.length);
+          setAudioBlob(wavBlob);
+        }).catch((error) => {
+          console.error("Error rendering audio buffer:", error);
+        });
+      }, (error) => {
+        console.error("Error decoding audio data:", error);
       });
     };
 
+    reader.onerror = (error) => {
+      console.error("Error reading file:", error);
+    };
+
     reader.readAsArrayBuffer(file);
+  };
+
+  const bufferToWave = (abuffer, len) => {
+    const numOfChan = abuffer.numberOfChannels,
+      length = len * numOfChan * 2 + 44,
+      buffer = new ArrayBuffer(length),
+      view = new DataView(buffer),
+      channels = [],
+      i,
+      sample,
+      offset = 0,
+      pos = 0;
+
+    setUint32(0x46464952); // "RIFF"
+    setUint32(length - 8); // file length - 8
+    setUint32(0x45564157); // "WAVE"
+
+    setUint32(0x20746d66); // "fmt " chunk
+    setUint32(16); // length = 16
+    setUint16(1); // PCM (uncompressed)
+    setUint16(numOfChan);
+    setUint32(abuffer.sampleRate);
+    setUint32(abuffer.sampleRate * 2 * numOfChan); // avg. bytes/sec
+    setUint16(numOfChan * 2); // block-align
+    setUint16(16); // 16-bit (hardcoded in this demo)
+
+    setUint32(0x61746164); // "data" - chunk
+    setUint32(length - pos - 4); // chunk length
+
+    for (i = 0; i < abuffer.numberOfChannels; i++) channels.push(abuffer.getChannelData(i));
+
+    while (pos < length) {
+      for (i = 0; i < numOfChan; i++) {
+        sample = Math.max(-1, Math.min(1, channels[i][offset])); // clamp
+        sample = (0.5 + sample * 32767) | 0; // scale to 16-bit signed int
+        view.setInt16(pos, sample, true); // write 16-bit sample
+        pos += 2;
+      }
+      offset++; // next source sample
+    }
+
+    return new Blob([buffer], { type: "audio/wav" });
+
+    function setUint16(data) {
+      view.setUint16(pos, data, true);
+      pos += 2;
+    }
+
+    function setUint32(data) {
+      view.setUint32(pos, data, true);
+      pos += 4;
+    }
   };
 
   const handleVideoPlay = () => {
@@ -74,16 +143,20 @@ const Index = () => {
   };
 
   const handleDownload = () => {
-    const asciiVideoBlob = new Blob([asciiFrames.join("\n\n")], { type: "text/plain;charset=utf-8" });
-    const asciiVideoUrl = URL.createObjectURL(asciiVideoBlob);
-    const audioUrl = URL.createObjectURL(audioBlob);
+    if (!asciiFrames.length || !audioBlob) {
+      console.error("Missing ASCII frames or audio data.");
+      return;
+    }
 
+    const asciiVideoBlob = new Blob([asciiFrames.join("\n\n")], { type: "text/plain;charset=utf-8" });
     const zip = new JSZip();
     zip.file("ascii-art.txt", asciiVideoBlob);
     zip.file("audio.wav", audioBlob);
 
     zip.generateAsync({ type: "blob" }).then((content) => {
       saveAs(content, "ascii-art-video.zip");
+    }).catch((error) => {
+      console.error("Error generating ZIP file:", error);
     });
   };
 
